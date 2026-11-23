@@ -1,0 +1,4 @@
+fitur,median_tanpa_stroke,median_stroke,p_value_MannWhitney
+age,43.0,71.0,3.8497341579673305e-71
+avg_glucose_level,91.5,105.2,3.583094987269707e-09
+bmi,28.0,29.7,0.00010418772123808268

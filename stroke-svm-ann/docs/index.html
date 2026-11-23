@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prediksi Stroke: SVM vs ANN | Case Study</title>
+<meta name="description" content="Case study machine learning: membandingkan SVM dan ANN pada data stroke yang sangat tidak seimbang, dan mengapa accuracy saja tidak cukup.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav><b>Stroke ML Case Study</b>
+  <a href="#masalah">Masalah</a><a href="#data">Data</a><a href="#metode">Metode</a><a href="#hasil">Hasil</a><a href="#insight">Insight</a></nav>
+
+<header class="hero">
+  <p class="eyebrow">Case study · Machine Learning · Healthcare</p>
+  <h1>Model dengan accuracy 95% yang tidak menemukan satu pun pasien stroke</h1>
+  <p class="lead">Perjalanan analisis dari data mentah hingga perbandingan <b>SVM</b> vs <b>ANN</b>, dan alasan mengapa <i>accuracy</i> bisa menyesatkan.</p>
+  <div class="kpis">
+    <div><span id="k-n"></span><small>pasien dianalisis</small></div>
+    <div><span id="k-prev"></span><small>kasus stroke</small></div>
+    <div><span id="k-auc"></span><small>ROC-AUC SVM terbaik</small></div>
+    <div><span id="k-rec"></span><small>recall SVM terbaik</small></div>
+  </div>
+</header>
+
+<main>
+<section id="masalah">
+  <h2>1. Mengapa dataset stroke, dan apa masalahnya?</h2>
+  <p>Stroke adalah penyebab utama kematian dan disabilitas. Pada <i>screening</i>, <b>melewatkan pasien berisiko jauh lebih mahal</b> daripada memeriksa ulang pasien sehat. Tetapi data stroke punya masalah klasik: <b>kelas sangat tidak seimbang</b>.</p>
+  <div class="grid2">
+    <div class="card"><canvas id="c-target"></canvas></div>
+    <div class="card callout"><h3>Accuracy paradox</h3>
+      <p>Model yang selalu menjawab <q>tidak stroke</q> sudah benar ±95% kasus. Angkanya bagus, modelnya tidak berguna. Karena itu kita menilai model dengan <b>recall, PR-AUC, dan F2</b>.</p></div>
+  </div>
+</section>
+
+<section id="data">
+  <h2>2. Apa yang dikatakan data?</h2>
+  <p>Hasil EDA dan uji statistik (Chi-square untuk kategorikal, Mann-Whitney untuk numerik) menunjukkan satu faktor yang mendominasi: <b>usia</b>.</p>
+  <div class="grid2">
+    <div class="card"><h3>Stroke rate per kelompok usia (%)</h3><canvas id="c-age"></canvas></div>
+    <div class="card"><h3>Kekuatan asosiasi fitur kategorikal (Cramér's V)</h3><canvas id="c-cv"></canvas></div>
+  </div>
+  <p class="note">Median usia pasien stroke 71 tahun vs 43 tahun pada pasien tanpa stroke. Gender dan tipe tempat tinggal tidak signifikan (p &gt; 0,05).</p>
+</section>
+
+<section id="metode">
+  <h2>3. Bagaimana data diolah dan model bekerja?</h2>
+  <ol class="steps">
+    <li><b>Cleaning</b><span>Hapus 1 baris gender "Other"; 201 bmi kosong diimputasi median.</span></li>
+    <li><b>Split 80/20 stratified</b><span>Proporsi stroke tetap ±5% di data latih dan uji.</span></li>
+    <li><b>Scaling + One-Hot</b><span>Semua di dalam Pipeline agar tidak ada <i>data leakage</i>.</span></li>
+    <li><b>Atasi imbalance</b><span>SVM: <code>class_weight</code>. ANN: SMOTE (hanya di data latih).</span></li>
+    <li><b>Tuning 5-fold CV</b><span>GridSearchCV berbasis ROC-AUC.</span></li>
+    <li><b>Optimasi threshold</b><span>Maksimalkan F2 pada prediksi out-of-fold.</span></li>
+  </ol>
+  <div class="grid2">
+    <div class="card"><h3>SVM</h3><p>Mencari <i>hyperplane</i> dengan margin terbesar. Kernel RBF memungkinkan batas non-linear. <code>C</code> mengatur toleransi kesalahan, <code>gamma</code> jangkauan pengaruh tiap sampel. Terpilih: <b>C=1, gamma=0,005</b>.</p></div>
+    <div class="card"><h3>ANN (MLP)</h3><p>Neuron berlapis yang belajar lewat <i>backpropagation</i> untuk meminimalkan log-loss. Terpilih: <b>1 layer 16 neuron, alpha=0,1</b>. Regularisasi kuat dibutuhkan karena data kecil.</p></div>
+  </div>
+</section>
+
+<section id="hasil">
+  <h2>4. Model mana yang lebih baik?</h2>
+  <p>Perhatikan: pada baseline, accuracy tertinggi, tetapi recall nol.</p>
+  <div class="card"><div class="tabs" id="tabs-metric"></div><canvas id="c-metrics" height="110"></canvas></div>
+  <div class="card scroll"><table id="tbl"></table></div>
+  <div class="grid2">
+    <div class="card"><div class="tabs" id="tabs-curve"><button class="on" data-k="roc">ROC</button><button data-k="pr">Precision-Recall</button></div><canvas id="c-curve"></canvas></div>
+    <div class="card"><h3>Confusion matrix (data uji, threshold teroptimasi)</h3><div class="cms" id="cms"></div></div>
+  </div>
+  <div class="card callout win" id="verdict"></div>
+</section>
+
+<section id="insight">
+  <h2>5. Insight utama</h2>
+  <div class="grid2">
+    <div class="card"><h3>Fitur paling berpengaruh (permutation importance)</h3><canvas id="c-imp"></canvas></div>
+    <div class="card"><ul class="ins">
+      <li><b>Usia</b> menyumbang hampir seluruh kekuatan prediksi (penurunan AUC ±0,30 vs &lt;0,04 fitur lain).</li>
+      <li><b>SVM lebih stabil</b>: gap AUC train-test 0,011 vs ANN 0,108, tanda ANN lebih mudah overfit pada 249 kasus positif.</li>
+      <li><b>Trade-off nyata</b>: precision ±15%, artinya ±5-6 alarm palsu per stroke yang terdeteksi. Cocok untuk screening, bukan diagnosis.</li>
+      <li><b>Asosiasi bukan kausalitas</b>: banyak fitur lain tercampur dengan usia.</li>
+    </ul></div>
+  </div>
+  <h3>Keterbatasan</h3>
+  <p>Hanya 50 kasus stroke di data uji, sehingga interval kepercayaan lebar. SMOTE dijalankan setelah one-hot encoding. Model dibuat untuk pembelajaran, bukan penggunaan klinis.</p>
+</section>
+</main>
+
+<footer>
+  <p>Stack: Python · scikit-learn · imbalanced-learn · Chart.js</p>
+  <p><a id="gh" href="https://github.com/USERNAME/stroke-svm-ann">Lihat notebook &amp; kode di GitHub</a></p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
